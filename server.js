@@ -128,7 +128,7 @@ async function readJson(req) {
 }
 
 function requiredEnv() {
-  return ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'RESEND_API_KEY', 'PRACTICE_EMAIL', 'FROM_EMAIL', 'RATE_LIMIT_SALT']
+  return ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'RATE_LIMIT_SALT']
     .filter((key) => !process.env[key]);
 }
 
@@ -164,52 +164,6 @@ async function saveSubmission(values, requestHash) {
   return typeof result === 'string' ? result : result?.id || result;
 }
 
-function escapeHtml(value) {
-  return String(value || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
-}
-
-async function sendPracticeNotification(values, submissionId) {
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: process.env.FROM_EMAIL,
-      to: [process.env.PRACTICE_EMAIL],
-      reply_to: values.email,
-      subject: `New waitlist request — ${values.firstName} ${values.lastName}`,
-      html: `<div style="font-family:Georgia,serif;color:#3f2929;line-height:1.6"><h2 style="font-weight:400">New waitlist request</h2><p><strong>Name:</strong> ${escapeHtml(values.firstName)} ${escapeHtml(values.lastName)}<br><strong>Preferred contact:</strong> ${escapeHtml(values.contactMethod)}</p><p>Sign in to the private practice dashboard to review the complete request.</p><p style="color:#7c6864;font-size:13px">Submission ID: ${escapeHtml(submissionId)}</p></div>`
-    })
-  });
-  if (!response.ok) throw new Error(`EMAIL_${response.status}`);
-}
-
-async function sendClientConfirmation(values) {
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: process.env.FROM_EMAIL,
-      to: [values.email],
-      subject: 'Your Inner Atelier waitlist request',
-      html: `<div style="font-family:Georgia,serif;color:#3f2929;line-height:1.6"><h2 style="font-weight:400">Thank you for joining the waitlist.</h2><p>Hi ${escapeHtml(values.firstName)},</p><p>We’ve received your request to join The Inner Atelier’s waitlist. We will contact you when we have an update about verifying and scheduling an appointment.</p><p>Warmly,<br>The Inner Atelier</p><p style="color:#7c6864;font-size:13px">This email confirms receipt of your request only; it does not establish a provider-patient relationship. If you are experiencing an emergency, contact local emergency services or 988 in the U.S.</p></div>`
-    })
-  });
-  if (!response.ok) throw new Error(`CLIENT_EMAIL_${response.status}`);
-}
-
-async function updateNotificationStatus(submissionId, status) {
-  await fetch(`${process.env.SUPABASE_URL}/rest/v1/waitlist?id=eq.${encodeURIComponent(submissionId)}`, {
-    method: 'PATCH',
-    headers: {
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal'
-    },
-    body: JSON.stringify({ notification_status: status, notification_updated_at: new Date().toISOString() })
-  });
-}
-
 async function handleWaitlist(req, res) {
   const missing = requiredEnv();
   if (missing.length) {
@@ -230,15 +184,7 @@ async function handleWaitlist(req, res) {
     }
     if (Object.keys(errors).length) return sendJson(res, 422, { message: 'Please correct the highlighted fields.', errors });
 
-    const submissionId = await saveSubmission(values, hash);
-    try {
-      await sendPracticeNotification(values, submissionId);
-      await sendClientConfirmation(values);
-      await updateNotificationStatus(submissionId, 'sent');
-    } catch (notificationError) {
-      console.error('Waitlist notification failed:', notificationError.message);
-      await updateNotificationStatus(submissionId, 'failed').catch(() => {});
-    }
+    await saveSubmission(values, hash);
     return sendJson(res, 201, { ok: true, message: 'You’re on the waitlist.' });
   } catch (error) {
     if (error.message === 'BODY_TOO_LARGE') return sendJson(res, 413, { message: 'The form response is too large.' });

@@ -18,11 +18,5 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: PRACTICE_EMAIL
-        sync: false
-      - key: FROM_EMAIL
-        sync: false
       - key: RATE_LIMIT_SALT
         generateValue: true
