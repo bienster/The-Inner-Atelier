@@ -16,17 +16,43 @@ Then open `http://localhost:3000`.
 
 1. Create a Supabase project and run `supabase.sql` in its SQL Editor.
 2. Create a Resend account, verify the sending domain, and choose the practice notification address.
-3. Copy `.env.example` to `.env` and fill in the values. Node does not load `.env` automatically; use your hosting provider’s environment settings, or start locally with those variables set in your shell.
+3. Copy `.env.example` to `.env` and fill in the values, including the Supabase anon key used by the server-side authentication proxy. Node does not load `.env` automatically; use your hosting provider’s environment settings, or start locally with those variables set in your shell.
 4. Never expose `SUPABASE_SERVICE_ROLE_KEY` in browser code or commit `.env`.
 
 The API performs independent server-side validation, writes through a locked-down Supabase function, sends the practice notification through Resend, hashes visitor IPs, and applies both in-memory and database-backed rate limits. Idempotency keys plus a 24-hour email check protect against duplicate submissions. A hidden honeypot and minimum completion time provide lightweight bot filtering.
+
+## Private practice dashboard
+
+The dashboard is available at `http://localhost:3000/admin`. It supports:
+
+- authenticated access through Supabase Auth;
+- waitlist search and status filtering;
+- request details and submission dates;
+- status changes (`pending`, `contacted`, `scheduled`, `removed`); and
+- permanent removal with a confirmation step.
+
+To authorize the therapist:
+
+1. In Supabase, create the therapist account under **Authentication → Users**. Do not enable public sign-up for the dashboard.
+2. Run the following in the SQL Editor, replacing the example email:
+
+```sql
+insert into public.admin_users (user_id, email)
+select id, email from auth.users
+where email = 'therapist@example.com'
+on conflict (user_id) do update set email = excluded.email;
+```
+
+3. Set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` as server environment variables and restart the server.
+
+The browser receives neither Supabase key nor session token. Authentication is proxied by the Node server, sessions use HttpOnly SameSite cookies, and waitlist reads/changes use the authenticated user JWT so Supabase Row Level Security remains in force. The `admin_users` allowlist controls which authenticated users can access the data.
 
 ## Before launch
 
 - Replace placeholder practice contact information and confirm the states where care is offered.
 - Add final Privacy Policy, Terms, fees, clinician credentials, licensure, and accessibility contact details.
 - Configure TLS/HTTPS at the host and set a long random `RATE_LIMIT_SALT`.
-- Review HIPAA/privacy requirements with counsel. If the form will collect protected health information, confirm appropriate BAAs and compliant configurations with every vendor (including hosting, Supabase, and email). The current copy intentionally asks visitors not to submit highly sensitive medical information.
+- Review HIPAA/privacy requirements with counsel. Using Supabase does not by itself make this application HIPAA compliant. If the form will collect protected health information, confirm appropriate BAAs, policies, retention controls, audit practices, and compliant configurations with every vendor (including hosting, Supabase, and email). The current copy intentionally asks visitors not to submit highly sensitive medical information.
 - Test one real form submission in production and verify both the Supabase record and notification email.
 
 ## Image asset

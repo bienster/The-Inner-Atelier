@@ -9,6 +9,9 @@ const MAX_BODY_BYTES = 16 * 1024;
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_REQUESTS = 4;
 const requestBuckets = new Map();
+const ADMIN_COOKIE = 'inner_atelier_admin';
+const ADMIN_REFRESH_COOKIE = 'inner_atelier_admin_refresh';
+const WAITLIST_STATUSES = new Set(['pending', 'contacted', 'scheduled', 'removed']);
 
 const US_STATES = new Set([
   'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'
@@ -35,8 +38,31 @@ function securityHeaders(contentType = 'application/json; charset=utf-8') {
 }
 
 function sendJson(res, status, payload, extraHeaders = {}) {
-  res.writeHead(status, { ...securityHeaders(), ...extraHeaders });
+  res.writeHead(status, { ...securityHeaders(), 'Cache-Control': 'no-store', ...extraHeaders });
   res.end(JSON.stringify(payload));
+}
+
+function parseCookies(req) {
+  return Object.fromEntries((req.headers.cookie || '').split(';').map((part) => part.trim()).filter(Boolean).map((part) => {
+    const index = part.indexOf('=');
+    return [decodeURIComponent(part.slice(0, index)), decodeURIComponent(part.slice(index + 1))];
+  }));
+}
+
+function cookieHeader(name, value, maxAge) {
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${secure}`;
+}
+
+function clearAdminCookies() {
+  return [cookieHeader(ADMIN_COOKIE, '', 0), cookieHeader(ADMIN_REFRESH_COOKIE, '', 0)];
+}
+
+function sameOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  const expected = process.env.SITE_URL || `http://${req.headers.host}`;
+  return origin === expected;
 }
 
 function clientIp(req) {
@@ -117,8 +143,8 @@ async function saveSubmission(values, requestHash) {
       p_phone: values.phone,
       p_state: values.state,
       p_contact_method: values.contactMethod,
-      p_support_request: values.support || null,
-      p_consent: values.consent,
+      p_support_description: values.support || null,
+      p_consent_to_contact: values.consent,
       p_idempotency_key: values.idempotencyKey,
       p_request_hash: requestHash
     })
@@ -128,7 +154,6 @@ async function saveSubmission(values, requestHash) {
     const duplicate = raw.includes('WAITLIST_DUPLICATE');
     const limited = raw.includes('WAITLIST_RATE_LIMIT');
     const error = new Error(duplicate ? 'DUPLICATE' : limited ? 'RATE_LIMIT' : 'DATABASE');
-    error.detail = raw;
     throw error;
   }
   const result = JSON.parse(raw);
@@ -140,7 +165,6 @@ function escapeHtml(value) {
 }
 
 async function sendNotification(values, submissionId) {
-  const support = values.support ? escapeHtml(values.support).replace(/\n/g, '<br>') : '<em>Not provided</em>';
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -149,14 +173,14 @@ async function sendNotification(values, submissionId) {
       to: [process.env.PRACTICE_EMAIL],
       reply_to: values.email,
       subject: `New waitlist request — ${values.firstName} ${values.lastName}`,
-      html: `<div style="font-family:Georgia,serif;color:#3f2929;line-height:1.6"><h2 style="font-weight:400">New waitlist request</h2><p><strong>Name:</strong> ${escapeHtml(values.firstName)} ${escapeHtml(values.lastName)}<br><strong>Email:</strong> ${escapeHtml(values.email)}<br><strong>Phone:</strong> ${escapeHtml(values.phone)}<br><strong>State:</strong> ${escapeHtml(values.state)}<br><strong>Preferred contact:</strong> ${escapeHtml(values.contactMethod)}</p><p><strong>Support requested:</strong><br>${support}</p><p style="color:#7c6864;font-size:13px">Submission ID: ${escapeHtml(submissionId)}</p></div>`
+      html: `<div style="font-family:Georgia,serif;color:#3f2929;line-height:1.6"><h2 style="font-weight:400">New waitlist request</h2><p><strong>Name:</strong> ${escapeHtml(values.firstName)} ${escapeHtml(values.lastName)}<br><strong>Preferred contact:</strong> ${escapeHtml(values.contactMethod)}</p><p>Sign in to the private practice dashboard to review the complete request.</p><p style="color:#7c6864;font-size:13px">Submission ID: ${escapeHtml(submissionId)}</p></div>`
     })
   });
   if (!response.ok) throw new Error(`EMAIL_${response.status}`);
 }
 
 async function updateNotificationStatus(submissionId, status) {
-  await fetch(`${process.env.SUPABASE_URL}/rest/v1/waitlist_submissions?id=eq.${encodeURIComponent(submissionId)}`, {
+  await fetch(`${process.env.SUPABASE_URL}/rest/v1/waitlist?id=eq.${encodeURIComponent(submissionId)}`, {
     method: 'PATCH',
     headers: {
       apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -201,14 +225,188 @@ async function handleWaitlist(req, res) {
     if (error.message === 'BODY_TOO_LARGE') return sendJson(res, 413, { message: 'The form response is too large.' });
     if (error.message === 'DUPLICATE') return sendJson(res, 409, { message: 'This email has already joined the waitlist recently. We’ll be in touch.' });
     if (error.message === 'RATE_LIMIT') return sendJson(res, 429, { message: 'Too many attempts. Please wait a little while and try again.' });
-    console.error('Waitlist submission failed:', error.detail || error);
+    console.error('Waitlist submission failed:', error.message);
     return sendJson(res, 500, { message: 'We couldn’t submit your request. Please try again, or contact the practice directly.' });
   }
 }
 
+function adminEnvReady() {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+}
+
+async function supabaseAuth(pathname, options = {}) {
+  return fetch(`${process.env.SUPABASE_URL}/auth/v1/${pathname}`, {
+    ...options,
+    headers: {
+      apikey: process.env.SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+}
+
+async function supabaseRest(pathname, token, options = {}) {
+  return fetch(`${process.env.SUPABASE_URL}/rest/v1/${pathname}`, {
+    ...options,
+    headers: {
+      apikey: process.env.SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+}
+
+async function refreshAdminSession(refreshToken) {
+  if (!refreshToken) return null;
+  const response = await supabaseAuth('token?grant_type=refresh_token', {
+    method: 'POST',
+    body: JSON.stringify({ refresh_token: refreshToken })
+  });
+  if (!response.ok) return null;
+  return response.json();
+}
+
+async function getAdmin(req, res) {
+  if (!adminEnvReady()) return null;
+  const cookies = parseCookies(req);
+  let accessToken = cookies[ADMIN_COOKIE];
+  let refreshToken = cookies[ADMIN_REFRESH_COOKIE];
+  let userResponse = accessToken
+    ? await supabaseAuth('user', { headers: { Authorization: `Bearer ${accessToken}` } })
+    : null;
+
+  if (!userResponse?.ok && refreshToken) {
+    const refreshed = await refreshAdminSession(refreshToken);
+    if (refreshed?.access_token) {
+      accessToken = refreshed.access_token;
+      refreshToken = refreshed.refresh_token || refreshToken;
+      res.setHeader('Set-Cookie', [
+        cookieHeader(ADMIN_COOKIE, accessToken, Number(refreshed.expires_in || 3600)),
+        cookieHeader(ADMIN_REFRESH_COOKIE, refreshToken, 60 * 60 * 24 * 30)
+      ]);
+      userResponse = await supabaseAuth('user', { headers: { Authorization: `Bearer ${accessToken}` } });
+    }
+  }
+  if (!userResponse?.ok) return null;
+  const user = await userResponse.json();
+  const adminResponse = await supabaseRest(`admin_users?user_id=eq.${encodeURIComponent(user.id)}&select=user_id,email`, accessToken);
+  if (!adminResponse.ok) return null;
+  const admins = await adminResponse.json();
+  if (!admins.length) return null;
+  return { user, token: accessToken };
+}
+
+async function handleAdminLogin(req, res) {
+  if (!sameOrigin(req)) return sendJson(res, 403, { message: 'Request origin was not accepted.' });
+  if (!adminEnvReady()) return sendJson(res, 503, { message: 'Admin authentication is not configured.' });
+  try {
+    const input = await readJson(req);
+    const email = clean(input.email, 254).toLowerCase();
+    const password = typeof input.password === 'string' ? input.password : '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) || password.length < 8) {
+      return sendJson(res, 422, { message: 'Enter a valid email and password.' });
+    }
+    const response = await supabaseAuth('token?grant_type=password', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    if (!response.ok) return sendJson(res, 401, { message: 'Email or password was not recognized.' });
+    const session = await response.json();
+    const adminCheck = await supabaseRest(`admin_users?user_id=eq.${encodeURIComponent(session.user.id)}&select=user_id`, session.access_token);
+    const admins = adminCheck.ok ? await adminCheck.json() : [];
+    if (!admins.length) return sendJson(res, 403, { message: 'This account does not have dashboard access.' });
+    return sendJson(res, 200, { ok: true, user: { email: session.user.email } }, {
+      'Set-Cookie': [
+        cookieHeader(ADMIN_COOKIE, session.access_token, Number(session.expires_in || 3600)),
+        cookieHeader(ADMIN_REFRESH_COOKIE, session.refresh_token, 60 * 60 * 24 * 30)
+      ]
+    });
+  } catch {
+    return sendJson(res, 400, { message: 'Unable to sign in. Please try again.' });
+  }
+}
+
+async function handleAdminSession(req, res) {
+  const admin = await getAdmin(req, res);
+  if (!admin) return sendJson(res, 401, { authenticated: false }, { 'Set-Cookie': clearAdminCookies() });
+  return sendJson(res, 200, { authenticated: true, user: { email: admin.user.email } });
+}
+
+function requireAdminBody(req, res) {
+  if (!sameOrigin(req)) {
+    sendJson(res, 403, { message: 'Request origin was not accepted.' });
+    return false;
+  }
+  return true;
+}
+
+async function handleAdminQuery(req, res) {
+  if (!requireAdminBody(req, res)) return;
+  const admin = await getAdmin(req, res);
+  if (!admin) return sendJson(res, 401, { message: 'Your session has expired. Please sign in again.' });
+  try {
+    const input = await readJson(req);
+    const status = clean(input.status, 20).toLowerCase();
+    const filter = status && WAITLIST_STATUSES.has(status) ? `&status=eq.${status}` : '';
+    const fields = 'id,first_name,last_name,email,phone,state,preferred_contact_method,support_description,consent_to_contact,status,created_at,updated_at';
+    const response = await supabaseRest(`waitlist?select=${fields}${filter}&order=created_at.desc&limit=500`, admin.token);
+    if (!response.ok) return sendJson(res, 502, { message: 'The waitlist could not be loaded.' });
+    const submissions = await response.json();
+    return sendJson(res, 200, { submissions });
+  } catch {
+    return sendJson(res, 400, { message: 'The waitlist request was invalid.' });
+  }
+}
+
+async function handleAdminUpdate(req, res) {
+  if (!requireAdminBody(req, res)) return;
+  const admin = await getAdmin(req, res);
+  if (!admin) return sendJson(res, 401, { message: 'Your session has expired. Please sign in again.' });
+  try {
+    const input = await readJson(req);
+    const id = clean(input.id, 50);
+    const status = clean(input.status, 20).toLowerCase();
+    if (!/^[a-f0-9-]{36}$/i.test(id) || !WAITLIST_STATUSES.has(status)) return sendJson(res, 422, { message: 'Invalid status update.' });
+    const response = await supabaseRest(`waitlist?id=eq.${encodeURIComponent(id)}`, admin.token, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status })
+    });
+    if (!response.ok) return sendJson(res, 502, { message: 'The status could not be updated.' });
+    const updated = await response.json();
+    return sendJson(res, 200, { submission: updated[0] });
+  } catch {
+    return sendJson(res, 400, { message: 'The update request was invalid.' });
+  }
+}
+
+async function handleAdminRemove(req, res) {
+  if (!requireAdminBody(req, res)) return;
+  const admin = await getAdmin(req, res);
+  if (!admin) return sendJson(res, 401, { message: 'Your session has expired. Please sign in again.' });
+  try {
+    const input = await readJson(req);
+    const id = clean(input.id, 50);
+    if (!/^[a-f0-9-]{36}$/i.test(id)) return sendJson(res, 422, { message: 'Invalid submission.' });
+    const response = await supabaseRest(`waitlist?id=eq.${encodeURIComponent(id)}`, admin.token, { method: 'DELETE' });
+    if (!response.ok) return sendJson(res, 502, { message: 'The submission could not be removed.' });
+    return sendJson(res, 200, { ok: true });
+  } catch {
+    return sendJson(res, 400, { message: 'The removal request was invalid.' });
+  }
+}
+
+async function handleAdminLogout(req, res) {
+  if (!sameOrigin(req)) return sendJson(res, 403, { message: 'Request origin was not accepted.' });
+  const cookies = parseCookies(req);
+  if (cookies[ADMIN_COOKIE] && adminEnvReady()) {
+    await supabaseAuth('logout', { method: 'POST', headers: { Authorization: `Bearer ${cookies[ADMIN_COOKIE]}` } }).catch(() => {});
+  }
+  return sendJson(res, 200, { ok: true }, { 'Set-Cookie': clearAdminCookies() });
+}
+
 function serveStatic(req, res) {
   const pathname = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
-  const routeMap = { '/': 'index.html', '/waitlist': 'waitlist.html', '/waitlist/': 'waitlist.html' };
+  const routeMap = { '/': 'index.html', '/waitlist': 'waitlist.html', '/waitlist/': 'waitlist.html', '/admin': 'admin.html', '/admin/': 'admin.html' };
   const requested = routeMap[pathname] || pathname.replace(/^\/+/, '');
   const filePath = path.resolve(PUBLIC_DIR, requested);
   if (!filePath.startsWith(PUBLIC_DIR + path.sep) && filePath !== path.join(PUBLIC_DIR, 'index.html')) {
@@ -229,6 +427,12 @@ function serveStatic(req, res) {
 
 const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/api/waitlist') return handleWaitlist(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/login') return handleAdminLogin(req, res);
+  if (req.method === 'GET' && req.url === '/api/admin/session') return handleAdminSession(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/query') return handleAdminQuery(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/update') return handleAdminUpdate(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/remove') return handleAdminRemove(req, res);
+  if (req.method === 'POST' && req.url === '/api/admin/logout') return handleAdminLogout(req, res);
   if (req.method === 'GET' || req.method === 'HEAD') return serveStatic(req, res);
   sendJson(res, 405, { message: 'Method not allowed.' }, { Allow: 'GET, HEAD, POST' });
 });

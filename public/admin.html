@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Practice Dashboard — The Inner Atelier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Italiana&family=Montserrat:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin.css">
+  <script src="/admin.js" defer></script>
+</head>
+<body>
+  <main>
+    <section class="login-view" data-login-view hidden>
+      <div class="login-art" aria-hidden="true"><div><span>The Inner Atelier</span><p>Private practice workspace</p></div></div>
+      <div class="login-panel">
+        <form class="login-card" data-login-form>
+          <a href="/" class="admin-brand">The Inner Atelier</a>
+          <p class="eyebrow">Practice dashboard</p>
+          <h1>Welcome back.</h1>
+          <p class="subcopy">Sign in with your authorized practice account.</p>
+          <label>Email address<input type="email" name="email" autocomplete="username" required></label>
+          <label>Password<input type="password" name="password" autocomplete="current-password" minlength="8" required></label>
+          <div class="form-message" role="alert" data-login-message></div>
+          <button class="primary-button" type="submit">Sign in securely</button>
+          <p class="security-note">Protected practice access. Credentials and session tokens are never stored in browser JavaScript.</p>
+        </form>
+      </div>
+    </section>
+
+    <section class="dashboard" data-dashboard hidden>
+      <aside class="sidebar">
+        <a class="sidebar-brand" href="/">The Inner<br>Atelier</a>
+        <nav aria-label="Dashboard navigation"><a class="active" href="#waitlist"><span>◇</span> Waitlist</a></nav>
+        <div class="sidebar-foot"><p data-admin-email></p><button type="button" data-logout>Sign out</button></div>
+      </aside>
+      <div class="workspace">
+        <header class="dashboard-header">
+          <div><p class="eyebrow">Practice dashboard</p><h1>Waitlist</h1><p class="dashboard-subtitle">Review and manage new care inquiries.</p></div>
+          <button class="refresh-button" type="button" data-refresh aria-label="Refresh waitlist">↻ <span>Refresh</span></button>
+        </header>
+
+        <section class="stats" aria-label="Waitlist summary">
+          <article><span>Total requests</span><strong data-stat="total">—</strong></article>
+          <article><span>Pending</span><strong data-stat="pending">—</strong></article>
+          <article><span>Contacted</span><strong data-stat="contacted">—</strong></article>
+          <article><span>Scheduled</span><strong data-stat="scheduled">—</strong></article>
+        </section>
+
+        <section class="list-card" id="waitlist">
+          <div class="list-tools">
+            <label class="search-box"><span aria-hidden="true">⌕</span><span class="sr-only">Search submissions</span><input type="search" placeholder="Search name, email, phone, or state" data-search></label>
+            <label class="status-filter"><span>Status</span><select data-status-filter><option value="">All statuses</option><option value="pending">Pending</option><option value="contacted">Contacted</option><option value="scheduled">Scheduled</option><option value="removed">Removed</option></select></label>
+          </div>
+          <div class="list-message" data-list-message>Loading waitlist…</div>
+          <div class="table-wrap" data-table-wrap hidden>
+            <table>
+              <thead><tr><th>Name</th><th>Contact</th><th>State</th><th>Preferred</th><th>Submitted</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody data-table-body></tbody>
+            </table>
+          </div>
+          <div class="pagination-note" data-results-count></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="detail-dialog" data-detail-dialog>
+    <div class="dialog-head"><div><p class="eyebrow">Waitlist request</p><h2 data-detail-name></h2></div><button type="button" class="icon-button" data-close-dialog aria-label="Close details">×</button></div>
+    <div class="detail-grid">
+      <div><span>Email</span><a data-detail-email></a></div><div><span>Phone</span><a data-detail-phone></a></div>
+      <div><span>State</span><strong data-detail-state></strong></div><div><span>Preferred contact</span><strong data-detail-contact></strong></div>
+      <div><span>Submitted</span><strong data-detail-created></strong></div><div><span>Last updated</span><strong data-detail-updated></strong></div>
+    </div>
+    <div class="support-block"><span>Support requested</span><p data-detail-support></p></div>
+    <div class="dialog-actions">
+      <label>Status<select data-detail-status><option value="pending">Pending</option><option value="contacted">Contacted</option><option value="scheduled">Scheduled</option><option value="removed">Removed</option></select></label>
+      <button class="danger-button" type="button" data-remove>Remove permanently</button>
+    </div>
+    <div class="dialog-message" role="status" data-dialog-message></div>
+  </dialog>
+
+  <dialog class="confirm-dialog" data-confirm-dialog>
+    <h2>Remove this submission?</h2><p>This permanently deletes the waitlist request. This action cannot be undone.</p>
+    <div><button type="button" data-cancel-remove>Cancel</button><button class="danger-button" type="button" data-confirm-remove>Remove submission</button></div>
+  </dialog>
+</body>
+</html>
