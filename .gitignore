@@ -1,5 +1,6 @@
 .env
+public/config.js
+supabase/functions/.env
 .DS_Store
 node_modules/
 npm-debug.log*
-

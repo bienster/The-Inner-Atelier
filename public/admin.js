@@ -9,24 +9,51 @@ const searchInput = document.querySelector('[data-search]');
 const statusFilter = document.querySelector('[data-status-filter]');
 const detailDialog = document.querySelector('[data-detail-dialog]');
 const confirmDialog = document.querySelector('[data-confirm-dialog]');
+const config = window.INNER_ATELIER_CONFIG;
 let submissions = [];
 let selectedId = null;
+let accessToken = null;
 
-async function api(path, options = {}) {
-  const response = await fetch(path, {
+function configReady() {
+  return Boolean(config?.supabaseUrl && config?.supabasePublishableKey);
+}
+
+function endpoint(path) {
+  if (!configReady()) throw new Error('The dashboard is not configured yet.');
+  return `${config.supabaseUrl.replace(/\/$/, '')}/${path}`;
+}
+
+async function request(path, options = {}, token = accessToken) {
+  const response = await fetch(endpoint(path), {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    credentials: 'same-origin'
+    headers: {
+      apikey: config.supabasePublishableKey,
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    }
   });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    if (response.status === 401 && path !== '/api/admin/login') showLogin();
-    throw new Error(result.message || 'Something went wrong.');
-  }
+  if (!response.ok) throw new Error(result.msg || result.message || 'Something went wrong.');
   return result;
 }
 
+async function api(path, options = {}) {
+  if (!accessToken) {
+    showLogin();
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+  try {
+    return await request(`rest/v1/${path}`, options);
+  } catch (error) {
+    if (/JWT|token|permission|not authorized/i.test(error.message)) showLogin();
+    throw error;
+  }
+}
+
 function showLogin() {
+  accessToken = null;
+  submissions = [];
   dashboard.hidden = true;
   loginView.hidden = false;
 }
@@ -82,8 +109,10 @@ async function loadWaitlist() {
   listMessage.textContent = 'Loading waitlist…';
   tableWrap.hidden = true;
   try {
-    const result = await api('/api/admin/query', { method: 'POST', body: JSON.stringify({ status: statusFilter.value }) });
-    submissions = result.submissions || [];
+    const status = statusFilter.value;
+    const filter = ['pending', 'contacted', 'scheduled', 'removed'].includes(status) ? `&status=eq.${status}` : '';
+    const fields = 'id,first_name,last_name,email,phone,state,preferred_contact_method,support_description,consent_to_contact,status,created_at,updated_at';
+    submissions = await api(`waitlist?select=${encodeURIComponent(fields)}${filter}&order=created_at.desc&limit=500`);
     updateStats();
     renderRows();
   } catch (error) {
@@ -117,10 +146,20 @@ loginForm.addEventListener('submit', async (event) => {
   button.disabled = true; loginMessage.textContent = '';
   const values = Object.fromEntries(new FormData(loginForm));
   try {
-    const result = await api('/api/admin/login', { method: 'POST', body: JSON.stringify(values) });
-    loginForm.reset(); showDashboard(result.user.email); await loadWaitlist();
-  } catch (error) { loginMessage.textContent = error.message; }
-  finally { button.disabled = false; }
+    const session = await request('auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify(values) }, null);
+    if (!session.access_token || !session.user?.id) throw new Error('Email or password was not recognized.');
+    accessToken = session.access_token;
+    const admins = await api(`admin_users?user_id=eq.${encodeURIComponent(session.user.id)}&select=user_id,email`);
+    if (!admins.length) throw new Error('This account does not have dashboard access.');
+    loginForm.reset();
+    showDashboard(session.user.email);
+    await loadWaitlist();
+  } catch (error) {
+    accessToken = null;
+    loginMessage.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
 });
 
 searchInput.addEventListener('input', renderRows);
@@ -135,9 +174,11 @@ document.querySelector('[data-detail-status]').addEventListener('change', async 
   const message = document.querySelector('[data-dialog-message]');
   event.target.disabled = true; message.textContent = 'Saving…';
   try {
-    const result = await api('/api/admin/update', { method: 'POST', body: JSON.stringify({ id: selectedId, status: event.target.value }) });
+    const updated = await api(`waitlist?id=eq.${encodeURIComponent(selectedId)}`, {
+      method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status: event.target.value })
+    });
     const index = submissions.findIndex((item) => item.id === selectedId);
-    if (index >= 0) submissions[index] = { ...submissions[index], ...result.submission };
+    if (index >= 0 && updated[0]) submissions[index] = { ...submissions[index], ...updated[0] };
     message.textContent = 'Status updated.'; updateStats(); renderRows();
   } catch (error) { message.textContent = error.message; }
   finally { event.target.disabled = false; }
@@ -148,7 +189,7 @@ document.querySelector('[data-cancel-remove]').addEventListener('click', () => c
 document.querySelector('[data-confirm-remove]').addEventListener('click', async (event) => {
   event.target.disabled = true;
   try {
-    await api('/api/admin/remove', { method: 'POST', body: JSON.stringify({ id: selectedId }) });
+    await api(`waitlist?id=eq.${encodeURIComponent(selectedId)}`, { method: 'DELETE' });
     submissions = submissions.filter((item) => item.id !== selectedId);
     confirmDialog.close(); detailDialog.close(); updateStats(); renderRows();
   } catch (error) { document.querySelector('[data-dialog-message]').textContent = error.message; confirmDialog.close(); }
@@ -156,13 +197,8 @@ document.querySelector('[data-confirm-remove]').addEventListener('click', async 
 });
 
 document.querySelector('[data-logout]').addEventListener('click', async () => {
-  await api('/api/admin/logout', { method: 'POST', body: '{}' }).catch(() => {});
-  submissions = []; showLogin();
+  if (accessToken) await request('auth/v1/logout', { method: 'POST' }).catch(() => {});
+  showLogin();
 });
 
-(async function initialize() {
-  try {
-    const session = await api('/api/admin/session');
-    showDashboard(session.user.email); await loadWaitlist();
-  } catch { showLogin(); }
-})();
+showLogin();

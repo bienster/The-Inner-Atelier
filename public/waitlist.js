@@ -8,6 +8,7 @@ const count = document.querySelector('[data-count]');
 const formStartedAt = Date.now();
 let submitting = false;
 let idempotencyKey = crypto.randomUUID();
+const config = window.INNER_ATELIER_CONFIG;
 
 supportField.addEventListener('input', () => { count.textContent = supportField.value.length.toLocaleString(); });
 
@@ -56,9 +57,16 @@ form.addEventListener('submit', async (event) => {
   submitButton.innerHTML = 'Sending thoughtfully…';
   alertBox.classList.remove('show');
   try {
-    const response = await fetch('/api/waitlist', {
+    if (!config?.supabaseUrl || !config?.supabasePublishableKey) {
+      throw new Error('The waitlist is being connected. Please contact the practice directly for now.');
+    }
+    const response = await fetch(`${config.supabaseUrl.replace(/\/$/, '')}/functions/v1/submit-waitlist`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: config.supabasePublishableKey,
+        Authorization: `Bearer ${config.supabasePublishableKey}`
+      },
       body: JSON.stringify({
         ...values,
         consent: form.elements.consent.checked,

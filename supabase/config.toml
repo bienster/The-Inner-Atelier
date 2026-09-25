@@ -1,0 +1,2 @@
+[functions.submit-waitlist]
+verify_jwt = false
