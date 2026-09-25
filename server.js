@@ -27,7 +27,7 @@ const MIME_TYPES = {
 };
 
 function securityHeaders(contentType = 'application/json; charset=utf-8') {
-  return {
+  const headers = {
     'Content-Type': contentType,
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
@@ -35,6 +35,10 @@ function securityHeaders(contentType = 'application/json; charset=utf-8') {
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
   };
+  if (process.env.NODE_ENV === 'production') {
+    headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+  }
+  return headers;
 }
 
 function sendJson(res, status, payload, extraHeaders = {}) {
@@ -124,7 +128,7 @@ async function readJson(req) {
 }
 
 function requiredEnv() {
-  return ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'RESEND_API_KEY', 'PRACTICE_EMAIL', 'FROM_EMAIL']
+  return ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'RESEND_API_KEY', 'PRACTICE_EMAIL', 'FROM_EMAIL', 'RATE_LIMIT_SALT']
     .filter((key) => !process.env[key]);
 }
 
@@ -164,7 +168,7 @@ function escapeHtml(value) {
   return String(value || '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 }
 
-async function sendNotification(values, submissionId) {
+async function sendPracticeNotification(values, submissionId) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -177,6 +181,20 @@ async function sendNotification(values, submissionId) {
     })
   });
   if (!response.ok) throw new Error(`EMAIL_${response.status}`);
+}
+
+async function sendClientConfirmation(values) {
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: process.env.FROM_EMAIL,
+      to: [values.email],
+      subject: 'Your Inner Atelier waitlist request',
+      html: `<div style="font-family:Georgia,serif;color:#3f2929;line-height:1.6"><h2 style="font-weight:400">Thank you for joining the waitlist.</h2><p>Hi ${escapeHtml(values.firstName)},</p><p>We’ve received your request to join The Inner Atelier’s waitlist. We will contact you when we have an update about verifying and scheduling an appointment.</p><p>Warmly,<br>The Inner Atelier</p><p style="color:#7c6864;font-size:13px">This email confirms receipt of your request only; it does not establish a provider-patient relationship. If you are experiencing an emergency, contact local emergency services or 988 in the U.S.</p></div>`
+    })
+  });
+  if (!response.ok) throw new Error(`CLIENT_EMAIL_${response.status}`);
 }
 
 async function updateNotificationStatus(submissionId, status) {
@@ -193,15 +211,15 @@ async function updateNotificationStatus(submissionId, status) {
 }
 
 async function handleWaitlist(req, res) {
-  const hash = ipHash(clientIp(req));
-  const memoryLimit = allowedByMemoryLimit(hash);
-  if (!memoryLimit.allowed) {
-    return sendJson(res, 429, { message: 'Too many attempts. Please wait a little while and try again.' }, { 'Retry-After': String(memoryLimit.retryAfter) });
-  }
   const missing = requiredEnv();
   if (missing.length) {
     console.error(`Missing environment variables: ${missing.join(', ')}`);
     return sendJson(res, 503, { message: 'The waitlist is being connected. Please contact the practice directly for now.' });
+  }
+  const hash = ipHash(clientIp(req));
+  const memoryLimit = allowedByMemoryLimit(hash);
+  if (!memoryLimit.allowed) {
+    return sendJson(res, 429, { message: 'Too many attempts. Please wait a little while and try again.' }, { 'Retry-After': String(memoryLimit.retryAfter) });
   }
   try {
     const input = await readJson(req);
@@ -214,7 +232,8 @@ async function handleWaitlist(req, res) {
 
     const submissionId = await saveSubmission(values, hash);
     try {
-      await sendNotification(values, submissionId);
+      await sendPracticeNotification(values, submissionId);
+      await sendClientConfirmation(values);
       await updateNotificationStatus(submissionId, 'sent');
     } catch (notificationError) {
       console.error('Waitlist notification failed:', notificationError.message);

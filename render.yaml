@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: the-inner-atelier
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SITE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: PRACTICE_EMAIL
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: RATE_LIMIT_SALT
+        generateValue: true
