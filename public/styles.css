@@ -24,6 +24,26 @@ body {
   font-size: 18px;
   line-height: 1.55;
 }
+body.site-page {
+  animation: page-enter 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    opacity 0.36s ease,
+    transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+}
+body.site-page.page-leaving {
+  opacity: 0;
+  transform: translateY(6px);
+}
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 body.menu-open {
   overflow: hidden;
 }
@@ -54,11 +74,11 @@ textarea {
   top: 10px;
 }
 .site-header {
-  height: 124px;
+  height: 96px;
   padding: 0 clamp(30px, 4vw, 68px);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 30px;
   position: sticky;
   top: 0;
@@ -95,6 +115,8 @@ h3 i,
 .main-nav {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: min(100%, 1040px);
   gap: clamp(20px, 2.6vw, 43px);
 }
 .main-nav a {
@@ -112,9 +134,12 @@ h3 i,
   width: 0;
   height: 2px;
   background: var(--wine);
-  transition: width 0.2s;
+  transition: width 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .main-nav a:hover:after {
+  width: 100%;
+}
+.main-nav a.active:after {
   width: 100%;
 }
 .main-nav .nav-cta {
@@ -132,6 +157,98 @@ h3 i,
 }
 .menu-toggle {
   display: none;
+}
+.home-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 47% 53%;
+  min-height: 770px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+.home-hero-copy {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 75px clamp(40px, 6vw, 105px) 180px;
+  background: radial-gradient(circle at 20% 45%, rgba(255, 255, 255, 0.7), transparent 58%);
+}
+.home-hero-copy h1 {
+  margin: 28px 0 22px;
+  font-size: clamp(66px, 7vw, 112px);
+  letter-spacing: 0.015em;
+}
+.home-hero-copy h1 span {
+  color: var(--wine);
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+}
+.home-hero-copy > p {
+  max-width: 560px;
+  margin-bottom: 30px;
+  font-size: 22px;
+  line-height: 1.55;
+}
+.home-hero-copy.visible h1 {
+  animation: intro-title-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.home-hero-copy.visible > p {
+  animation: intro-copy-in 0.85s 0.35s ease-out both;
+}
+.home-actions {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.home-actions .button {
+  padding: 17px 30px;
+}
+.text-link {
+  padding: 9px 0 6px;
+  border-bottom: 1px solid var(--gold);
+  color: var(--wine-dark);
+  font: 500 11px var(--sans);
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.text-link span {
+  margin-left: 8px;
+  color: var(--gold);
+}
+.home-hero-image {
+  position: relative;
+  background: url("/assets/atelier-still-life.png") 57% center/cover no-repeat;
+}
+.home-hero-image:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--cream) 0%, rgba(250, 246, 240, 0.68) 8%, transparent 26%);
+  pointer-events: none;
+}
+.home-image-note {
+  position: absolute;
+  right: 9%;
+  bottom: 185px;
+  padding: 22px 28px;
+  background: rgba(250, 246, 240, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  box-shadow: 0 12px 35px rgba(80, 52, 38, 0.08);
+  font-size: 21px;
+}
+.home-image-note i {
+  color: var(--wine);
+}
+#home,
+#about,
+#approach,
+#services,
+#faq,
+#contact {
+  scroll-margin-top: 96px;
 }
 .about-hero {
   position: relative;
@@ -277,7 +394,7 @@ h1 {
 }
 .about-image {
   position: relative;
-  background: url("/assets/atelier-still-life.png") 57% center/cover no-repeat;
+  background: url("/assets/atelier-still-life.png") right center/cover no-repeat;
 }
 .about-image::before {
   content: "";
@@ -295,14 +412,15 @@ h1 {
 .quote-card {
   position: absolute;
   z-index: 1;
-  top: 225px;
-  right: 13%;
-  padding: 35px 45px;
+  top: 15%;
+  right: 8%;
+  width: min(320px, 55%);
+  padding: 32px 34px;
   background: rgba(250, 246, 240, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.8);
   text-align: center;
   box-shadow: 0 12px 35px rgba(80, 52, 38, 0.08);
-  transform: rotate(2deg);
+  transform: rotate(1deg);
   font-size: 20px;
   line-height: 1.25;
 }
@@ -1003,7 +1121,7 @@ footer p {
 }
 @media (max-width: 1100px) {
   .site-header {
-    height: 105px;
+    height: 92px;
   }
   .brand strong {
     font-size: 28px;
@@ -1019,6 +1137,10 @@ footer p {
   }
   .main-nav .nav-cta {
     padding: 17px 20px;
+  }
+  .home-hero-copy {
+    padding-left: 45px;
+    padding-right: 35px;
   }
   .about-copy {
     padding-left: 40px;
@@ -1051,8 +1173,9 @@ footer p {
     font-size: 16px;
   }
   .site-header {
-    height: 88px;
+    height: 76px;
     padding: 0 24px;
+    justify-content: flex-end;
   }
   .brand strong {
     font-size: 25px;
@@ -1085,10 +1208,10 @@ footer p {
   }
   .main-nav {
     position: absolute;
-    top: 88px;
+    top: 76px;
     left: 0;
     right: 0;
-    height: calc(100vh - 88px);
+    height: calc(100vh - 76px);
     padding: 30px;
     background: var(--cream);
     display: flex;
@@ -1114,6 +1237,26 @@ footer p {
     font: 400 13px var(--sans);
     text-transform: uppercase;
   }
+  .home-hero {
+    grid-template-columns: 1fr;
+  }
+  .home-hero-copy {
+    min-height: 560px;
+    padding: 65px 28px 150px;
+  }
+  .home-hero-copy h1 {
+    font-size: clamp(64px, 17vw, 92px);
+  }
+  .home-hero-image {
+    min-height: 570px;
+  }
+  .home-hero-image:before {
+    background: linear-gradient(180deg, var(--cream) 0%, rgba(250, 246, 240, 0.3) 12%, transparent 27%);
+  }
+  .home-image-note {
+    right: 24px;
+    bottom: 50px;
+  }
   .about-hero {
     grid-template-columns: 1fr;
   }
@@ -1134,6 +1277,7 @@ footer p {
   .quote-card {
     top: auto;
     bottom: 50px;
+    width: auto;
   }
   .wide-quote {
     position: relative;
@@ -1209,6 +1353,23 @@ footer p {
 @media (max-width: 520px) {
   h1 {
     font-size: 51px;
+  }
+  .home-hero-copy {
+    min-height: 520px;
+  }
+  .home-hero-copy h1 {
+    font-size: 61px;
+  }
+  .home-hero-copy > p {
+    font-size: 19px;
+  }
+  .home-actions {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .home-hero-image {
+    min-height: 460px;
   }
   .section-intro h2 {
     font-size: 39px;

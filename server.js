@@ -380,7 +380,7 @@ async function handleAdminLogout(req, res) {
 
 function serveStatic(req, res) {
   const pathname = new URL(req.url, `http://${req.headers.host || 'localhost'}`).pathname;
-  const routeMap = { '/': 'index.html', '/waitlist': 'waitlist.html', '/waitlist/': 'waitlist.html', '/admin': 'admin.html', '/admin/': 'admin.html' };
+  const routeMap = { '/': 'index.html', '/about': 'about.html', '/about/': 'about.html', '/waitlist': 'waitlist.html', '/waitlist/': 'waitlist.html', '/admin': 'admin.html', '/admin/': 'admin.html' };
   const requested = routeMap[pathname] || pathname.replace(/^\/+/, '');
   const filePath = path.resolve(PUBLIC_DIR, requested);
   if (!filePath.startsWith(PUBLIC_DIR + path.sep) && filePath !== path.join(PUBLIC_DIR, 'index.html')) {
