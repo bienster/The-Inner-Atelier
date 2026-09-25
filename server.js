@@ -46,6 +46,15 @@ function sendJson(res, status, payload, extraHeaders = {}) {
   res.end(JSON.stringify(payload));
 }
 
+function serveBrowserConfig(res) {
+  const config = {
+    supabaseUrl: process.env.SUPABASE_URL || '',
+    supabasePublishableKey: process.env.SUPABASE_ANON_KEY || ''
+  };
+  res.writeHead(200, { ...securityHeaders('text/javascript; charset=utf-8'), 'Cache-Control': 'no-store' });
+  res.end(`window.INNER_ATELIER_CONFIG = Object.freeze(${JSON.stringify(config)});`);
+}
+
 function parseCookies(req) {
   return Object.fromEntries((req.headers.cookie || '').split(';').map((part) => part.trim()).filter(Boolean).map((part) => {
     const index = part.indexOf('=');
@@ -391,6 +400,7 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && req.url === '/config.js') return serveBrowserConfig(res);
   if (req.method === 'POST' && req.url === '/api/waitlist') return handleWaitlist(req, res);
   if (req.method === 'POST' && req.url === '/api/admin/login') return handleAdminLogin(req, res);
   if (req.method === 'GET' && req.url === '/api/admin/session') return handleAdminSession(req, res);
