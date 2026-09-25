@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Join The Inner Atelier waitlist for personalized psychiatry and therapy.">
+  <title>Join the Waitlist — The Inner Atelier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Italiana&family=Montserrat:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script><script src="/waitlist.js" defer></script>
+</head>
+<body class="waitlist-page">
+  <a class="skip-link" href="#waitlist-form">Skip to form</a>
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="The Inner Atelier home"><strong>The Inner Atelier</strong><span>Care, <i>thoughtfully</i> tailored.</span></a>
+    <button class="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" data-menu-toggle><span></span><span></span></button>
+    <nav class="main-nav" aria-label="Primary navigation" data-nav><a href="/">Home</a><a href="/#about">About</a><a href="/#approach">Approach</a><a href="/#services">Services</a><a href="/#faq">FAQ</a><a href="/#contact">Contact</a><a class="nav-cta" href="/waitlist">Join the waitlist</a></nav>
+  </header>
+
+  <main class="waitlist-shell">
+    <aside class="waitlist-aside">
+      <div class="waitlist-aside-content">
+        <div class="section-kicker">Join the waitlist</div>
+        <h1>Begin <i>Your</i> Care</h1>
+        <p>Thoughtful care starts with understanding what you’re looking for.</p>
+        <div class="divider"></div>
+        <p>Complete the brief form to join The Inner Atelier’s waitlist. Once appointments become available, we’ll reach out with next steps.</p>
+      </div>
+    </aside>
+
+    <section class="form-panel">
+      <div class="form-panel-inner" data-form-view>
+        <div class="form-heading">
+          <div class="section-kicker"><span>01</span> Tell us about yourself</div>
+          <h2>Let’s begin, <i>gently.</i></h2>
+          <p>Fields marked with an asterisk are required.</p>
+        </div>
+
+        <form class="waitlist-form" id="waitlist-form" novalidate>
+          <div class="field">
+            <label for="firstName">First name <span class="required">*</span></label>
+            <input id="firstName" name="firstName" type="text" autocomplete="given-name" maxlength="60" required>
+            <span class="error-text" id="firstName-error">Enter your first name.</span>
+          </div>
+          <div class="field">
+            <label for="lastName">Last name <span class="required">*</span></label>
+            <input id="lastName" name="lastName" type="text" autocomplete="family-name" maxlength="60" required>
+            <span class="error-text" id="lastName-error">Enter your last name.</span>
+          </div>
+          <div class="field">
+            <label for="email">Email <span class="required">*</span></label>
+            <input id="email" name="email" type="email" autocomplete="email" maxlength="254" required>
+            <span class="error-text" id="email-error">Enter a valid email address.</span>
+          </div>
+          <div class="field">
+            <label for="phone">Phone number <span class="required">*</span></label>
+            <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="30" required>
+            <span class="error-text" id="phone-error">Enter a valid phone number.</span>
+          </div>
+          <div class="field full">
+            <label for="state">State <span class="required">*</span></label>
+            <select id="state" name="state" autocomplete="address-level1" required>
+              <option value="">Select your state</option>
+              <option value="AL">Alabama</option><option value="AK">Alaska</option><option value="AZ">Arizona</option><option value="AR">Arkansas</option><option value="CA">California</option><option value="CO">Colorado</option><option value="CT">Connecticut</option><option value="DE">Delaware</option><option value="DC">District of Columbia</option><option value="FL">Florida</option><option value="GA">Georgia</option><option value="HI">Hawaii</option><option value="ID">Idaho</option><option value="IL">Illinois</option><option value="IN">Indiana</option><option value="IA">Iowa</option><option value="KS">Kansas</option><option value="KY">Kentucky</option><option value="LA">Louisiana</option><option value="ME">Maine</option><option value="MD">Maryland</option><option value="MA">Massachusetts</option><option value="MI">Michigan</option><option value="MN">Minnesota</option><option value="MS">Mississippi</option><option value="MO">Missouri</option><option value="MT">Montana</option><option value="NE">Nebraska</option><option value="NV">Nevada</option><option value="NH">New Hampshire</option><option value="NJ">New Jersey</option><option value="NM">New Mexico</option><option value="NY">New York</option><option value="NC">North Carolina</option><option value="ND">North Dakota</option><option value="OH">Ohio</option><option value="OK">Oklahoma</option><option value="OR">Oregon</option><option value="PA">Pennsylvania</option><option value="RI">Rhode Island</option><option value="SC">South Carolina</option><option value="SD">South Dakota</option><option value="TN">Tennessee</option><option value="TX">Texas</option><option value="UT">Utah</option><option value="VT">Vermont</option><option value="VA">Virginia</option><option value="WA">Washington</option><option value="WV">West Virginia</option><option value="WI">Wisconsin</option><option value="WY">Wyoming</option>
+            </select>
+            <span class="error-text" id="state-error">Select your state.</span>
+          </div>
+
+          <fieldset class="contact-choice">
+            <legend>Preferred contact method <span class="required">*</span></legend>
+            <div class="contact-options">
+              <label class="contact-option"><input type="radio" name="contactMethod" value="email" required><span>Email</span></label>
+              <label class="contact-option"><input type="radio" name="contactMethod" value="phone"><span>Phone</span></label>
+              <label class="contact-option"><input type="radio" name="contactMethod" value="text"><span>Text</span></label>
+            </div>
+            <span class="error-text" id="contactMethod-error">Choose a contact method.</span>
+          </fieldset>
+
+          <div class="field full">
+            <label for="support">What are you hoping to receive support with?</label>
+            <textarea id="support" name="support" maxlength="2000" placeholder="Share only what feels comfortable."></textarea>
+            <span class="field-hint"><span data-count>0</span> / 2,000 characters · Optional</span>
+          </div>
+
+          <div class="field honeypot" aria-hidden="true">
+            <label for="website">Website</label>
+            <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+          </div>
+
+          <div class="consent-row">
+            <label class="check-label" for="consent">
+              <input id="consent" name="consent" type="checkbox" required>
+              <span>I understand that submitting this form does not establish a provider-patient relationship. <span class="required">*</span></span>
+            </label>
+            <span class="error-text" id="consent-error">Consent is required to join the waitlist.</span>
+          </div>
+
+          <div class="privacy-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5z"/><path d="M12 14v3"/></svg>
+            <span><strong>Your privacy matters.</strong> Please do not include urgent, emergency, or highly sensitive medical information in this form.</span>
+          </div>
+
+          <div class="form-alert" role="alert" aria-live="polite" data-form-alert></div>
+
+          <div class="form-actions">
+            <button class="button button-dark submit-button" type="submit" data-submit>Join the waitlist <span>↗</span></button>
+            <span>This form is encrypted in transit. We’ll only use your information to respond to your inquiry.</span>
+          </div>
+        </form>
+      </div>
+
+      <div class="success-state" data-success tabindex="-1">
+        <div class="success-card">
+          <div class="success-mark" aria-hidden="true">✓</div>
+          <div class="section-kicker" style="justify-content:center"><span>Thank you</span> Your note is with us</div>
+          <h2>You’re on the <i>waitlist.</i></h2>
+          <p>We’ve received your inquiry and will review it with care. We’ll reach out using your preferred contact method when an appropriate opening becomes available.</p>
+          <a class="button button-outline" href="/">Return to the practice <span>→</span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

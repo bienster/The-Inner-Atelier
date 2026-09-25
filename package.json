@@ -1,0 +1,14 @@
+{
+  "name": "the-inner-atelier",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Editorial website and secure waitlist for The Inner Atelier.",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "check": "node --check server.js && node --check public/app.js && node --check public/waitlist.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
